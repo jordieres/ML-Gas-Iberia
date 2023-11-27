@@ -11,6 +11,7 @@ import plotly.offline as py
 import plotly.express as px
 import seaborn as sns
 #
+from os.path import exists
 from plotly import tools
 from pathlib import Path
 from datetime import date, timedelta
@@ -44,161 +45,71 @@ class VAction(argparse.Action):
 #
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("-w", "--vars", type=str, required=True,
-        help="Filename with excel variable structure to be processed")
-    ap.add_argument("-f", "--file", type=str, required=True,
-        help="Filename with excel dataset to be processed")
-    ap.add_argument("-o", "--output", type=str, required=True,
+    ap.add_argument("-p", "--pickle", type=str, required=True,
         help="Filename for the pickle container. Row1: dat; Row2: Vars; Row3: Groups; Row4: Dat per group")
+    ap.add_argument("-g", "--group", type=str, required=True,
+        help="Interesting group to be developed further")
+    ap.add_argument("-o", "--output", type=str, required=True,
+        help="Directory to place the created models")
+    ap.add_argument("-t", "--target", type=str, required=True,
+        help="Comma separated list of varables to be modelled")
+    ap.add_argument("-l", "--list", type=str, required=False,
+        help="List the gropus exisitng in pickle container")
+    ap.add_argument("-w", "--vars", type=str, required=False,
+        help="List the var names in the interesting group")
     ap.add_argument('-v', nargs='?', action=VAction, dest='verbose')
     #
     args    = vars(ap.parse_args())
     # print('{} --> {}'.format(sys.argv[1:], args))
-    pfich1  = args["file"]
-    pfich2  = args["vars"]
-    pfich3  = args["output"]
+    pfich1  = args["pickle"]
+    grp     = args["group"]
+    dmdl    = args["output"]
+    svmdl   = args["target"]
+    listg   = args["list"]
+    slistv  = args["vars"]
     verbose = args["verbose"]
     if verbose is None:
         verbose = 0
-    dat     = carga(pfich1,pfich2,verbose)
-    datl    = limpia(dat, verbose)
-    dats    = segmenta(datl,verbose)
     #
-    with open(pfich3, "wb") as output_file:
-        pickle.dump(dats['datos'],output_file,pickle.HIGHEST_PROTOCOL)
-        pickle.dump(dats['vindices'],output_file,pickle.HIGHEST_PROTOCOL)
-        pickle.dump(dats['grupos'],output_file,pickle.HIGHEST_PROTOCOL)
-        pickle.dump(dats['datgrps'],output_file,pickle.HIGHEST_PROTOCOL)
+    pkl_is  = exists(pfich1)
+    if not pkl_is:
+        print(" *** Error: File " + pfich1 + "does not exist. We can't follow up")
+        sys.exit(2)
+    if not os.path.isdir(dmdl):
+        print(" *** Error: Directory " + dmdl + "does not exist. We can't follow up")
+        sys.exit(2)
+    if verbose > 1:
+        print("- Loading datasets ...")
+    with open(pfich1, "rb") as input_file:
+        rg01 = pickle.load(input_file)
+        del rg01
+        vidx = pickle.load(input_file)
+        lgrps= pickle.load(input_file)
+        datg = pickle.load(input_file)
+    if verbose > 1:
+        print("- Datasets loaded ...")
+    if grp not in lgrps:
+        print(" *** Error: Group "+ str(grp)+ " not included in " + \
+                ",".join(lgrps) + ". We can't proceed further")
+        sys.exit(2)
+    else:
+        dat = datg[grp]
+        del datg
+        tvrs= dat.columns.tolist()
+    listv = []
+    if len(slistv) > 0:
+        tmplistv = [i for i in slistv.split(',')]
+        for j in tmplistv:
+            r = re.compile(j)
+            nlist= list(filter(r.match, tvrs))
+            listv.append(nlist)
+    if verbose > 0:
+        print("- Interesting list of variables to be modelled:")
+        print("  "+",".join(listv))
     #
+    
     return(None)
 #
-def carga(datf,varf,vrb):
-    sheet_to_df_map = pd.read_excel(datf, sheet_name=None)
-    sheet_to_df_map.keys()
-    odat    = sheet_to_df_map['Sheet1']
-    #
-    sheet_to_df_map = pd.read_excel(varf, sheet_name=None)
-    sheet_to_df_map.keys()
-    varindx = sheet_to_df_map['server_taglist_cpi']
-    #
-    lgrps   = varindx['GLOBAL_CODE_ID'].unique()
-    #
-    # Quitamos valores no numéricos de los datos
-    #
-    for k in odat.columns:
-        idx = odat[odat[k].apply(lambda x: isinstance(x,str))].index
-        if len(idx) > 0:
-            if vrb > 1:
-                print('Var: '+k + ' => ' + str(len(idx)))
-            odat = odat.drop(index=idx)
-            odat[k] = odat[k].astype(float)
-        else:
-            if k != 'index':
-                odat[k] = odat[k].astype(float)
-    return({'datos':odat,'vindices':varindx,'grupos':lgrps})
-#
-def limpia(dat,vrb):
-    # Se quitan los datos no numéricos y las variables en conflicto
-    #
-    odat    = dat['datos'].copy()
-    varindx = dat['vindices'].copy()
-    lgrps   = dat['grupos'].copy()
-    # 
-    # Corrección de variables: GRLL-MEDAS-EMI-EMISARIO_HR_AMB_UA
-    odat = odat.rename(columns={'GRLL0222FQLM1_x': 'GRLL0222FQLM1',
-                                'GRLL0220cv1_pos_x':'GRLL0220cv1_pos',
-                                'GRLL0220acv1_pos_x': 'GRLL0220acv1_pos'})
-    #
-    # En varindex hay entradas _x y _y que no sabemos qué hacen pero que no encajan con los datos
-    # Variables de datos que no están en la tabla de Jerarquía (después de quitar los _x e _y
-    for j in range(1,len(odat.columns)):
-        txtj = odat.columns[j]
-        idx  = (varindx['TAG'] == txtj)
-        ldx  = len(varindx['TAG'].index[idx])
-        if ldx == 0:
-            if vrb > 0:
-                print('*** ERROR: Var no encontrada {}'.format(txtj))
-    # Variables de la tabla de Jerarquía que no están en los datos.
-    lkeys = '|'.join(odat.columns[1:])
-    result = varindx.loc[~varindx['TAG'].str.contains(lkeys, case=False)]
-    if (result.shape[0] > 0) & (vrb > 0):    
-        print("*** ERROR: Variables de Jerarquía NO USADAS ***")
-        print(result['TAG'])
-    return({'datos':odat,'vindices':varindx,'grupos':lgrps})
-#
-def var_map(j,nname):
-    if j == 'index':
-        return('Time:ISO')
-    return(nname.loc[nname['TAG']==j,'NNORM'].tolist()[0])
-#
-def plus30min(idx,dat):
-    k  = dat.index.get_loc(idx)
-    k1 = dat.iloc[k:k+4].index
-    return(k1)
-#
-def segmenta(dat,vrb):
-    # Segmentación por Sistemas
-    #
-    odat    = dat['datos'].copy()
-    varindx = dat['vindices'].copy()
-    lgrps   = dat['grupos'].copy()
-    clean   = varindx.loc[varindx['DESCRIPCION'].str.contains(
-                        'POTENCIA ACTIVA'),['TAG','GLOBAL_CODE_ID']]
-    dtime   = {}
-    for i in clean.index:
-        varj= clean.loc[i,'TAG']
-        grp = clean.loc[i,'GLOBAL_CODE_ID']
-        toff= odat.loc[odat[varj] < 15,:].index
-        if len(toff) > 0:
-            tmv = plus30min(toff[0],odat)
-        for j in range(1,len(toff)):
-            tmvp= plus30min(toff[j],odat)
-            tmv = tmv.union(tmvp)
-        dtime[grp] = tmv
-    dosunouno = odat.loc[list(set(odat.index) - set(
-                dtime[71].union(dtime[72]).union(dtime[76])))].index
-    dostodo   = odat.loc[list(set(odat.index) - set(
-                dtime[71].union(dtime[72])))].index
-    unounocero= odat.loc[list(set(dostodo) - set(dosunouno) )].index
-    unotodovap= odat.loc[list(set(odat.index) - set(
-                dtime[71]).union(dtime[76]))].index
-    unocerouno= odat.loc[list(set(unotodovap) - set(dosunouno) )].index
-    todounocer= odat.loc[list(set(odat.index) - set(
-                dtime[72]).union(dtime[76]))].index
-    cerounouno= odat.loc[list(set(todounocer) - set(dosunouno) )].index
-    off       = odat.loc[list(set(dtime[71].union(
-                dtime[72]).union(dtime[76])) )].index
-    odat.loc[off,'LABEL']        = '0+0+0'
-    odat.loc[dosunouno,'LABEL']  = '1+1+1'
-    odat.loc[unounocero,'LABEL'] = '1+1+0'
-    odat.loc[unocerouno,'LABEL'] = '1+0+1'
-    odat.loc[cerounouno,'LABEL'] = '0+1+1'
-    if vrb > 1:
-        print(odat['LABEL'].value_counts())
-    #
-    datgrp    = {}
-    lkeys  = '|'.join(odat.columns[1:])
-    r = re.compile("GRLL-MEDAS.*")
-    for i in lgrps:
-        if vrb > 0:
-            print(' *** Procesando grupo:' + str(i))
-        nname   = varindx.loc[varindx['GLOBAL_CODE_ID'].isin([i]),['TAG',
-                                'GLOBAL_CODE_ID','DESCRIPCION','UNIDAD']]
-        nlist   = list(filter(r.match, odat.columns))
-        for j in nlist:
-            if j not in nname['TAG'].tolist():
-                nname2  = varindx.loc[varindx['TAG'].isin([j]),['TAG', \
-                                'GLOBAL_CODE_ID','DESCRIPCION','UNIDAD']]
-                nname   = pd.concat([nname,nname2], axis=0)
-        nname   = nname.loc[nname['TAG'].str.contains(lkeys, case=False)]
-        nname['NNORM'] = nname['DESCRIPCION'].str.replace(' ','_')+':'+ \
-                    nname['UNIDAD'].astype(str)
-        # Nombres explicativos de las varaibles creados
-        dat_unt = odat.loc[:,['index']+nname['TAG'].tolist()]
-        newnms = [ var_map(j,nname) for j in dat_unt.columns]
-        dat_unt.columns = newnms
-        datgrp[i]= dat_unt
-    return({'datos':odat,'vindices':varindx,'grupos':lgrps,'datgrps':datgrp})
 #
 #
 if __name__ == "__main__":
