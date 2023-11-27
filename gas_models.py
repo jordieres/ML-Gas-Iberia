@@ -47,15 +47,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-p", "--pickle", type=str, required=True,
         help="Filename for the pickle container. Row1: dat; Row2: Vars; Row3: Groups; Row4: Dat per group")
-    ap.add_argument("-g", "--group", type=str, required=True,
+    ap.add_argument("-g", "--group", type=int, required=True,
         help="Interesting group to be developed further")
     ap.add_argument("-o", "--output", type=str, required=True,
         help="Directory to place the created models")
     ap.add_argument("-t", "--target", type=str, required=True,
         help="Comma separated list of varables to be modelled")
-    ap.add_argument("-l", "--list", type=str, required=False,
+    ap.add_argument("-l", "--list", action='store_true', required=False,
         help="List the gropus exisitng in pickle container")
-    ap.add_argument("-w", "--vars", type=str, required=False,
+    ap.add_argument("-w", "--vars", action='store_true', required=False,
         help="List the var names in the interesting group")
     ap.add_argument('-v', nargs='?', action=VAction, dest='verbose')
     #
@@ -90,24 +90,32 @@ def main():
         print("- Datasets loaded ...")
     if grp not in lgrps:
         print(" *** Error: Group "+ str(grp)+ " not included in " + \
-                ",".join(lgrps) + ". We can't proceed further")
+                ",".join([str(j) for j in lgrps]) + \
+                ". We can't proceed further")
         sys.exit(2)
     else:
         dat = datg[grp]
         del datg
         tvrs= dat.columns.tolist()
     listv = []
-    if len(slistv) > 0:
-        tmplistv = [i for i in slistv.split(',')]
+    if len(svmdl) > 0:
+        tmplistv = [i for i in svmdl.split(',')]
         for j in tmplistv:
             r = re.compile(j)
             nlist= list(filter(r.match, tvrs))
-            listv.append(nlist)
+            listv = listv +nlist
     if verbose > 0:
         print("- Interesting list of variables to be modelled:")
-        print("  "+",".join(listv))
+        print("   "+",\n   ".join(listv))
     #
-    
+    if listg:
+        print("- List of Groups with recorded data:")
+        print("  " + ",".join(lgrps))
+    #
+    if slistv:
+        print("- List of Variables in group "+str(grp)+" with recorded data:")
+        print("  " + ",\n   ".join(dat.columns.tolist()))
+    #
     return(None)
 #
 #
