@@ -131,7 +131,7 @@ def var_map(j,nname):
         return('Time:ISO')
     return(nname.loc[nname['TAG']==j,'NNORM'].tolist()[0])
 #
-def plus30min(idx,dat):    # Más de 30 mins después de haber dejado la barrera de 15MW
+def plus30min(idx,dat):
     k  = dat.index.get_loc(idx)
     k1 = dat.iloc[k:k+4].index
     return(k1)
@@ -148,7 +148,7 @@ def segmenta(dat,vrb):
     for i in clean.index:
         varj= clean.loc[i,'TAG']
         grp = clean.loc[i,'GLOBAL_CODE_ID']
-        toff= odat.loc[odat[varj] < 15,:].index # Identificando < 15MW
+        toff= odat.loc[odat[varj] < 15,:].index
         if len(toff) > 0:
             tmv = plus30min(toff[0],odat)
         for j in range(1,len(toff)):
