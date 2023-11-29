@@ -1,8 +1,9 @@
 import ast, json, random, argparse
 import os, sys, datetime, shutil, pdb
 import statistics, smtplib, ssl, re, string
-import datetime, math, pickle
-import pdb
+import datetime, math, pickle, pdb
+import h2o
+#
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -18,8 +19,9 @@ from datetime import date, timedelta
 from tempfile import mkstemp
 from argparse import ArgumentParser
 from urllib.error import URLError
-#
-#
+from h2o.automl import H2OAutoML
+from h2o.model.models.regression import h2o_mean_squared_error
+from h2o.estimators import H2OModelSelectionEstimator
 #
 #
 # ====================================================================
@@ -53,6 +55,11 @@ def main():
         help="Directory to place the created models")
     ap.add_argument("-t", "--target", type=str, required=True,
         help="Comma separated list of varables to be modelled")
+    ap.add_argument("-n", "--nump", type=int, required=True,
+        help="Number of parameters for reduced models")
+    ap.add_argument("-d", "--date", type=str, required=False,
+        help="Date for training validation split: YYYY-MM-DD", 
+        default="2023-03-27")
     ap.add_argument("-l", "--list", action='store_true', required=False,
         help="List the gropus exisitng in pickle container")
     ap.add_argument("-w", "--vars", action='store_true', required=False,
@@ -67,7 +74,9 @@ def main():
     svmdl   = args["target"]
     listg   = args["list"]
     slistv  = args["vars"]
+    nump    = args["nump"]
     verbose = args["verbose"]
+    dates   = datetime.datetime.strptime(args["date"],"%Y-%m-%d")
     if verbose is None:
         verbose = 0
     #
@@ -106,7 +115,7 @@ def main():
             listv = listv +nlist
     if verbose > 0:
         print("- Interesting list of variables to be modelled:")
-        print("   "+",\n   ".join(listv))
+        print("     "+",\n     ".join(listv))
     #
     if listg:
         print("- List of Groups with recorded data:")
@@ -114,9 +123,105 @@ def main():
     #
     if slistv:
         print("- List of Variables in group "+str(grp)+" with recorded data:")
-        print("  " + ",\n   ".join(dat.columns.tolist()))
+        print("    " + ",\n    ".join(dat.columns.tolist()))
     #
+    mdlT    = {}
+    for il in listv:
+        mdl = train_model(dat,vidx,dmdl,il,nump,dates,verbose)
+        if verbose > 1:
+            print(mdl)
+        mdlT[il]=mdl
+    if verbose > 0:
+        print(mdlT)
+    ecopkl  = dmdl+"/summary_mdls_"+ datetime.datetime.strftime(
+            datetime.datetime.now(),"%Y-%m-%dT%H:%M:%S") + ".pkl"
+    #
+    with open(ecopkl, "wb") as output_file:
+        pickle.dump(mdlT,output_file,pickle.HIGHEST_PROTOCOL)
+        pickle.dump(vidx,output_file,pickle.HIGHEST_PROTOCOL)
+        pickle.dump(datg,output_file,pickle.HIGHEST_PROTOCOL)
     return(None)
+#
+def train_model(dat,vars,dout,vmodel,nump,lngcut,vrb):
+    # Se toma la serie desde el inicio hasta el 27/3/2023 como criterio para entrenamiento
+    # Después test.
+    # lngcut = datetime.datetime.strptime('2023-03-27 00:00:00',"%Y-%m-%d %H:%M:%S")
+    DFtrain= dat.loc[dat['Time:ISO'] < lngcut,list(set(dat.columns) - 
+                                                    set(['Time:ISO']))]
+    DFtest = dat.loc[dat['Time:ISO'] >= lngcut,list(set(dat.columns) - 
+                                                    set(['Time:ISO']))]
+    h2o.init(verbose=False)
+    h2o_frame = h2o.H2OFrame(DFtrain)
+    x = h2o_frame.columns
+    y = vmodel
+    x.remove(y)
+    #
+    h2o_automl = H2OAutoML(sort_metric='mse',max_runtime_secs=30*60,
+                           seed=666,verbosity=None)
+    h20_err    = h2o_automl.train(x=x, y=y, training_frame=h2o_frame)
+    ltmdls     = h2o.automl.get_leaderboard(h2o_automl,extra_columns ="ALL")
+    #
+    h2o_frame_test = h2o.H2OFrame(DFtest)
+    y_pred   = h2o_automl.predict(h2o_frame_test)
+    y_actual = h2o.H2OFrame(DFtest[[y]])
+    yerr     = h2o_mean_squared_error(y_actual, y_pred)
+    varimp   = h2o_automl.varimp(use_pandas=True)
+    if vrb > 0:
+        print("   - Full Ensemble Model MSE:"+str(yerr))
+        print(varimp)
+    bm       = h2o_automl.leader
+    metalearner = h2o.get_model(h2o_automl.leader.metalearner().model_id)
+    perf     = bm.model_performance(h2o_frame_test)
+    if vrb > 1:
+        print("   - Full Single Model MSE:"+str(perf))
+    #
+    nam_mdl  = h2o.save_model(model=bm, path=dout, force=True)
+    if vrb > 0:
+        print("   - Name of Full Model:"+ nam_mdl)
+    mdlT     = {'mdl':bm,'train':h20_err,'restr':ltmdls,'yorg':y_actual,
+                'ypred':y_pred,'mse':yerr,'mdl_imp':varimp,
+                'mdl_id':metalearner,'perf':perf,'mdl_nam':nam_mdl}
+    #
+    # Restricted model ...
+    sweepModel= H2OModelSelectionEstimator(mode="backward", # backward, maxr, maxrsweep, allsubsets
+                                        max_predictor_number=nump, seed=666)
+    gmdls = sweepModel.train(x=x, y=y, training_frame=h2o_frame)
+    bcoef = sweepModel.coef()[nump]
+    lclsR = list(bcoef.keys())[1:]
+    datR  = dat[['Time:ISO',vmodel]+lclsR]
+    #
+    DFtrainR= datR.loc[datR['Time:ISO'] < lngcut,list(set(datR.columns) - 
+                                                        set(['Time:ISO']))]
+    DFtestR = datR.loc[datR['Time:ISO'] >= lngcut,list(set(datR.columns) - 
+                                                        set(['Time:ISO']))]    
+    h2o_frameR = h2o.H2OFrame(DFtrainR)
+    x = h2o_frameR.columns
+    x.remove(y)
+    #
+    h2o_automlR = H2OAutoML(sort_metric='mse',max_runtime_secs=15*60,
+                            seed=666,verbosity=None)
+    h20_errR = h2o_automlR.train(x=x, y=y, training_frame=h2o_frameR)
+    ltmdlsR  = h2o.automl.get_leaderboard(h2o_automlR,extra_columns ="ALL")
+    h2o_frame_testR = h2o.H2OFrame(DFtestR)
+    y_predR  = h2o_automlR.predict(h2o_frame_testR)
+    y_actualR= h2o.H2OFrame(DFtestR[[y]])
+    yerrR    = h2o_mean_squared_error(y_actualR, y_predR)
+    varimpR  = h2o_automlR.varimp(use_pandas=True)
+    #
+    bmR      = h2o_automlR.leader
+    metalearnerR= h2o.get_model(h2o_automlR.leader.metalearner().model_id)
+    perfR    = bmR.model_performance(h2o_frame_testR)
+    if vrb > 1:
+        print("   - Restricted Single Model MSE:"+str(perfR))
+    #
+    nam_mdlR = h2o.save_model(model=bmR, path=dout+'/short/', force=True)
+    if vrb > 0:
+        print("   - Name of Restricted Model:"+ nam_mdlR)
+    mdlR     = {'mdl':bmR,'train':h20_errR,'restr':ltmdlsR,'yorg':y_actualR,
+                'ypred':y_predR,'mse':yerrR,'mdl_imp':varimpR,
+                'mdl_id':metalearnerR,'perf':perfR,'mdl_nam':nam_mdlR}
+    res = {'Full':mdlT,'Rest':mdlR}
+    return(res)
 #
 #
 #
