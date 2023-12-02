@@ -190,20 +190,20 @@ def segmenta(dat,cdate,vrb):
     for i in lgrps:
         if vrb > 0:
             print(' *** Procesando grupo:' + str(i))
-        nname   = varindx.loc[varindx['GLOBAL_CODE_ID'].isin([i]),['TAG',
+        nname    = varindx.loc[varindx['GLOBAL_CODE_ID'].isin([i]),['TAG',
                                 'GLOBAL_CODE_ID','DESCRIPCION','UNIDAD']]
-        nlist   = list(filter(r.match, odat.columns))
+        nlist    = list(filter(r.match, odat.columns))
         for j in nlist:
             if j not in nname['TAG'].tolist():
-                nname2  = varindx.loc[varindx['TAG'].isin([j]),['TAG', \
+                nname2 = varindx.loc[varindx['TAG'].isin([j]),['TAG', \
                                 'GLOBAL_CODE_ID','DESCRIPCION','UNIDAD']]
-                nname   = pd.concat([nname,nname2], axis=0)
-        nname   = nname.loc[nname['TAG'].str.contains(lkeys, case=False)]
+                nname  = pd.concat([nname,nname2], axis=0)
+        nname    = nname.loc[nname['TAG'].str.contains(lkeys, case=False)]
         nname['NNORM'] = nname['DESCRIPCION'].str.replace(' ','_')+':'+ \
                     nname['UNIDAD'].astype(str)
         # Nombres explicativos de las varaibles creados
-        dat_unt = odat.loc[:,['index']+nname['TAG'].tolist()]
-        newnms = [ var_map(j,nname) for j in dat_unt.columns]
+        dat_unt  = odat.loc[:,['index']+nname['TAG'].tolist()]
+        newnms   = [ var_map(j,nname) for j in dat_unt.columns]
         dat_unt.columns = newnms
         datgrp[i]= dat_unt
     return({'datos':odat,'vindices':varindx,'grupos':lgrps,'datgrps':datgrp})

@@ -16,10 +16,13 @@
             "request": "launch",
             "program": "${file}",
             "args": [
-                "--file",   "Datos_summary_1923_03102023.xlsx",
-                "--vars",   "server_taglist_cpi.xlsx",
-                "--date",   "2023-03-28",
-                "--output", "eval.pkl",
+                "--pickle",   "trained_models/summary_mdls_2023-12-01T02:47:04.pkl",
+                "--file",     "eval.pkl",
+                "--group",    "71",
+                "--output",   "pred_01.xlsx",
+                "--target",   "POTENCIA_AC.*",
+                "--model",    ".*",
+                "--list",
                 ]
             "console": "integratedTerminal",
             "justMyCode": true

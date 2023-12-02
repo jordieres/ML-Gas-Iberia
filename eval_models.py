@@ -52,9 +52,11 @@ class VAction(argparse.Action):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-p", "--pickle", type=str, required=True,
-        help="Filename for the dill container of models. Row1: models; Row3: Dat per group")
+        help="Filename for the pickle container of models. \
+              Row1: models; Row3: Dat per group")
     ap.add_argument("-f", "--file", type=str, required=True,
-        help="Filename pickle for records to be assesed. One row per group")
+        help="Filename pickle for records to be assesed. \
+              One row for gropus and other for data to be evaluated")
     ap.add_argument("-g", "--group", type=int, required=True,
         help="Interesting group for the prediction")
     ap.add_argument("-o", "--output", type=str, required=True,
