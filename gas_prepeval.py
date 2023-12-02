@@ -66,7 +66,8 @@ def main():
     ap.add_argument("-d", "--date", type=valid_date, required=True,
         help="From Date for prepare for assessment. Format YYYY-MM-DD")
     ap.add_argument("-o", "--output", type=str, required=True,
-        help="Filename for the pickle container. Row1: dat; Row2: Vars; Row3: Groups; Row4: Dat per group")
+        help="Filename for the pickle container. \
+              Row1: list of groups; Row2: Dictionary of data per group")
     ap.add_argument('-v', nargs='?', action=VAction, dest='verbose')
     #
     args    = vars(ap.parse_args())
