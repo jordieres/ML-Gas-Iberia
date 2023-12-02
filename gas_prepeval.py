@@ -52,7 +52,7 @@ class VAction(argparse.Action):
 #
 def valid_date(s):
     try:
-        return datetime.strptime(s, "%Y-%m-%d")
+        return datetime.datetime.strptime(s, "%Y-%m-%d")
     except ValueError:
         msg = "not a valid date: {0!r}".format(s)
         raise argparse.ArgumentTypeError(msg)
@@ -161,12 +161,7 @@ def segmenta(dat,cdate,vrb):
         varj= clean.loc[i,'TAG']
         grp = clean.loc[i,'GLOBAL_CODE_ID']
         toff= odat.loc[odat[varj] < 15,:].index # Identificando < 15MW
-        if len(toff) > 0:
-            tmv = odat.index.get_loc(toff[0])
-        for j in range(1,len(toff)):
-            tmvp= odat.index.get_loc(toff[j])
-            tmv = tmv.union(tmvp)
-        dtime[grp] = tmv
+        dtime[grp] = toff
     dosunouno = odat.loc[list(set(odat.index) - set(
                 dtime[71].union(dtime[72]).union(dtime[76])))].index
     dostodo   = odat.loc[list(set(odat.index) - set(
