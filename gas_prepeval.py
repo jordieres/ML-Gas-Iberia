@@ -1,9 +1,9 @@
 #
 # Starting from the excel file provided with variable values
 # and the file with the description of variables we will prepare a 
-# pickle file with records for models to be trained.
+# pickle file with records after a date.
 #
-# The pickle file will be used in gas_models.py
+# The pickle file will be used in eval_models.py
 # (C) UPM.  JOM 2023-11-30
 # 
 import ast, json, random, argparse
@@ -50,12 +50,21 @@ class VAction(argparse.Action):
                 self.values = values.count('v')+1
         setattr(args, self.dest, self.values)
 #
+def valid_date(s):
+    try:
+        return datetime.strptime(s, "%Y-%m-%d")
+    except ValueError:
+        msg = "not a valid date: {0!r}".format(s)
+        raise argparse.ArgumentTypeError(msg)
+#
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-w", "--vars", type=str, required=True,
         help="Filename with excel variable structure to be processed")
     ap.add_argument("-f", "--file", type=str, required=True,
         help="Filename with excel dataset to be processed")
+    ap.add_argument("-d", "--date", type=valid_date, required=True,
+        help="From Date for prepare for assessment. Format YYYY-MM-DD")
     ap.add_argument("-o", "--output", type=str, required=True,
         help="Filename for the pickle container. Row1: dat; Row2: Vars; Row3: Groups; Row4: Dat per group")
     ap.add_argument('-v', nargs='?', action=VAction, dest='verbose')
@@ -65,16 +74,15 @@ def main():
     pfich1  = args["file"]
     pfich2  = args["vars"]
     pfich3  = args["output"]
+    cdate   = args["date"]
     verbose = args["verbose"]
     if verbose is None:
         verbose = 0
     dat     = carga(pfich1,pfich2,verbose)
     datl    = limpia(dat, verbose)
-    dats    = segmenta(datl,verbose)
+    dats    = segmenta(datl,cdate,verbose)
     #
     with open(pfich3, "wb") as output_file:
-        pickle.dump(dats['datos'],output_file,pickle.HIGHEST_PROTOCOL)
-        pickle.dump(dats['vindices'],output_file,pickle.HIGHEST_PROTOCOL)
         pickle.dump(dats['grupos'],output_file,pickle.HIGHEST_PROTOCOL)
         pickle.dump(dats['datgrps'],output_file,pickle.HIGHEST_PROTOCOL)
     #
@@ -139,12 +147,7 @@ def var_map(j,nname):
         return('Time:ISO')
     return(nname.loc[nname['TAG']==j,'NNORM'].tolist()[0])
 #
-def plus30min(idx,dat):    # Más de 30 mins después de haber dejado la barrera de 15MW
-    k  = dat.index.get_loc(idx)
-    k1 = dat.iloc[k:k+4].index
-    return(k1)
-#
-def segmenta(dat,vrb):
+def segmenta(dat,cdate,vrb):
     # Segmentación por Sistemas
     #
     odat    = dat['datos'].copy()
@@ -158,9 +161,9 @@ def segmenta(dat,vrb):
         grp = clean.loc[i,'GLOBAL_CODE_ID']
         toff= odat.loc[odat[varj] < 15,:].index # Identificando < 15MW
         if len(toff) > 0:
-            tmv = plus30min(toff[0],odat)
+            tmv = odat.index.get_loc(toff[0])
         for j in range(1,len(toff)):
-            tmvp= plus30min(toff[j],odat)
+            tmvp= odat.index.get_loc(toff[j])
             tmv = tmv.union(tmvp)
         dtime[grp] = tmv
     dosunouno = odat.loc[list(set(odat.index) - set(
@@ -184,9 +187,10 @@ def segmenta(dat,vrb):
     if vrb > 1:
         print(odat['LABEL'].value_counts())
     #
-    datgrp    = {}
+    datgrp = {}
     lkeys  = '|'.join(odat.columns[1:])
-    r = re.compile("GRLL-MEDAS.*")
+    r      = re.compile("GRLL-MEDAS.*")
+    odat   = odat.loc[odat['index'] >= cdate,:]
     for i in lgrps:
         if vrb > 0:
             print(' *** Procesando grupo:' + str(i))

@@ -1,19 +1,23 @@
+#
+# Starting from the pickle file elaborated by gas_preprocess.py
+# and the file with the description of variables we will train 
+# ML models to predict those variables.
+#
+# The trained models will be stored in a folder with a short version in a 
+# short subdirectory and a summary in pickle format with the index of models.
+#
+# (C) UPM.  JOM 2023-11-30
+# 
 import ast, json, random, argparse
 import os, sys, datetime, shutil, pdb
 import statistics, smtplib, ssl, re, string
-import datetime, math, pickle, pdb
+import datetime, math, pickle, dill, pdb
 import h2o
 #
 import numpy as np
 import pandas as pd
-import streamlit as st
-import plotly.graph_objects as go
-import plotly.offline as py
-import plotly.express as px
-import seaborn as sns
 #
 from os.path import exists
-from plotly import tools
 from pathlib import Path
 from datetime import date, timedelta
 from tempfile import mkstemp
@@ -104,7 +108,6 @@ def main():
         sys.exit(2)
     else:
         dat = datg[grp]
-        del datg
         tvrs= dat.columns.tolist()
     listv = []
     if len(svmdl) > 0:
@@ -127,7 +130,7 @@ def main():
     #
     mdlT    = {}
     for il in listv:
-        mdl = train_model(dat,vidx,dmdl,il,nump,dates,verbose)
+        mdl = train_model(dat,vidx,dmdl,il,nump,dates,grp,verbose)
         if verbose > 1:
             print(mdl)
         mdlT[il]=mdl
@@ -137,12 +140,12 @@ def main():
             datetime.datetime.now(),"%Y-%m-%dT%H:%M:%S") + ".pkl"
     #
     with open(ecopkl, "wb") as output_file:
-        pickle.dump(mdlT,output_file,pickle.HIGHEST_PROTOCOL)
-        pickle.dump(vidx,output_file,pickle.HIGHEST_PROTOCOL)
-        pickle.dump(datg,output_file,pickle.HIGHEST_PROTOCOL)
+        dill.dump(mdlT,output_file)
+        dill.dump(vidx,output_file)
+        dill.dump(datg,output_file)
     return(None)
 #
-def train_model(dat,vars,dout,vmodel,nump,lngcut,vrb):
+def train_model(dat,vars,dout,vmodel,nump,lngcut,grp,vrb):
     # Se toma la serie desde el inicio hasta el 27/3/2023 como criterio para entrenamiento
     # Después test.
     # lngcut = datetime.datetime.strptime('2023-03-27 00:00:00',"%Y-%m-%d %H:%M:%S")
@@ -170,7 +173,7 @@ def train_model(dat,vars,dout,vmodel,nump,lngcut,vrb):
         print("   - Full Ensemble Model MSE:"+str(yerr))
         print(varimp)
     bm       = h2o_automl.leader
-    metalearner = h2o.get_model(h2o_automl.leader.metalearner().model_id)
+    # metalearner = h2o.get_model(h2o_automl.leader.metalearner().model_id)
     perf     = bm.model_performance(h2o_frame_test)
     if vrb > 1:
         print("   - Full Single Model MSE:"+str(perf))
@@ -178,9 +181,9 @@ def train_model(dat,vars,dout,vmodel,nump,lngcut,vrb):
     nam_mdl  = h2o.save_model(model=bm, path=dout, force=True)
     if vrb > 0:
         print("   - Name of Full Model:"+ nam_mdl)
-    mdlT     = {'mdl':bm,'train':h20_err,'restr':ltmdls,'yorg':y_actual,
-                'ypred':y_pred,'mse':yerr,'mdl_imp':varimp,
-                'mdl_id':metalearner,'perf':perf,'mdl_nam':nam_mdl}
+    mdlT     = {'y':y,'x':x,'train':h20_err,'restr':ltmdls,'yorg':y_actual,
+                'ypred':y_pred,'mse':yerr,'mdl_imp':varimp,'grp':grp,
+                'perf':perf,'mdl_nam':nam_mdl}
     #
     # Restricted model ...
     sweepModel= H2OModelSelectionEstimator(mode="backward", # backward, maxr, maxrsweep, allsubsets
@@ -209,7 +212,7 @@ def train_model(dat,vars,dout,vmodel,nump,lngcut,vrb):
     varimpR  = h2o_automlR.varimp(use_pandas=True)
     #
     bmR      = h2o_automlR.leader
-    metalearnerR= h2o.get_model(h2o_automlR.leader.metalearner().model_id)
+    # metalearnerR= h2o.get_model(h2o_automlR.leader.metalearner().model_id)
     perfR    = bmR.model_performance(h2o_frame_testR)
     if vrb > 1:
         print("   - Restricted Single Model MSE:"+str(perfR))
@@ -217,9 +220,9 @@ def train_model(dat,vars,dout,vmodel,nump,lngcut,vrb):
     nam_mdlR = h2o.save_model(model=bmR, path=dout+'/short/', force=True)
     if vrb > 0:
         print("   - Name of Restricted Model:"+ nam_mdlR)
-    mdlR     = {'mdl':bmR,'train':h20_errR,'restr':ltmdlsR,'yorg':y_actualR,
-                'ypred':y_predR,'mse':yerrR,'mdl_imp':varimpR,
-                'mdl_id':metalearnerR,'perf':perfR,'mdl_nam':nam_mdlR}
+    mdlR     = {'y':y,'x':x,'train':h20_errR,'restr':ltmdlsR,'yorg':y_actualR,
+                'ypred':y_predR,'mse':yerrR,'mdl_imp':varimpR,'grp':grp,
+                'perf':perfR,'mdl_nam':nam_mdlR}
     res = {'Full':mdlT,'Rest':mdlR}
     return(res)
 #
