@@ -232,6 +232,7 @@ def extract_perf(obj):
     res['model_category']   = obj._metric_json['model_category']
     res['nobs']  = obj._metric_json['nobs']
     res['algo']  = obj._algo
+    res['on']    = obj._on
     res['residual_degrees_of_freedom'] = obj._metric_json['residual_degrees_of_freedom']
     res['MSE']   = obj._metric_json['MSE']
     res['RMSE']  = obj._metric_json['RMSE']
