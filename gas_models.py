@@ -140,9 +140,9 @@ def main():
             datetime.datetime.now(),"%Y-%m-%dT%H:%M:%S") + ".pkl"
     #
     with open(ecopkl, "wb") as output_file:
-        dill.dump(mdlT,output_file)
-        dill.dump(vidx,output_file)
-        dill.dump(datg,output_file)
+        pickle.dump(mdlT,output_file)
+        pickle.dump(vidx,output_file)
+        pickle.dump(datg,output_file)
     return(None)
 #
 def train_model(dat,vars,dout,vmodel,nump,lngcut,grp,vrb):
@@ -181,9 +181,9 @@ def train_model(dat,vars,dout,vmodel,nump,lngcut,grp,vrb):
     nam_mdl  = h2o.save_model(model=bm, path=dout, force=True)
     if vrb > 0:
         print("   - Name of Full Model:"+ nam_mdl)
-    mdlT     = {'y':y,'x':x,'train':h20_err,'restr':ltmdls,'yorg':y_actual,
-                'ypred':y_pred,'mse':yerr,'mdl_imp':varimp,'grp':grp,
-                'perf':perf,'mdl_nam':nam_mdl}
+    mdlT     = {'y':y,'x':x,'yorg':y_actual,'ypred':y_pred,'mse':yerr,
+                'mdl_imp':varimp,'grp':grp,'perf':extract_perf(perf),
+                'mdl_nam':nam_mdl}
     #
     # Restricted model ...
     sweepModel= H2OModelSelectionEstimator(mode="backward", # backward, maxr, maxrsweep, allsubsets
@@ -220,10 +220,28 @@ def train_model(dat,vars,dout,vmodel,nump,lngcut,grp,vrb):
     nam_mdlR = h2o.save_model(model=bmR, path=dout+'/short/', force=True)
     if vrb > 0:
         print("   - Name of Restricted Model:"+ nam_mdlR)
-    mdlR     = {'y':y,'x':x,'train':h20_errR,'restr':ltmdlsR,'yorg':y_actualR,
-                'ypred':y_predR,'mse':yerrR,'mdl_imp':varimpR,'grp':grp,
-                'perf':perfR,'mdl_nam':nam_mdlR}
+    mdlR     = {'y':y,'x':x,'yorg':y_actualR,'ypred':y_predR,'mse':yerrR,
+                'mdl_imp':varimpR,'grp':grp,'perf':extract_perf(perfR),
+                'mdl_nam':nam_mdlR}          
     res = {'Full':mdlT,'Rest':mdlR}
+    return(res)
+#
+def extract_perf(obj):
+    res = {}
+    res['model'] = obj._metric_json['model']
+    res['model_category']   = obj._metric_json['model_category']
+    res['nobs']  = obj._metric_json['nobs']
+    res['algo']  = obj._algo
+    res['residual_degrees_of_freedom'] = obj._metric_json['residual_degrees_of_freedom']
+    res['MSE']   = obj._metric_json['MSE']
+    res['RMSE']  = obj._metric_json['RMSE']
+    res['r2']    = obj._metric_json['r2']
+    res['rmsle'] = obj._metric_json['rmsle']
+    res['mae']   = obj._metric_json['mae']
+    res['mean_residual_deviance']= obj._metric_json['mean_residual_deviance']
+    res['residual_deviance']= obj._metric_json['residual_deviance']
+    res['AIC']   = obj._metric_json['AIC']
+    res['null_deviance']    = obj.__metric_json['null_deviance']
     return(res)
 #
 #

@@ -53,10 +53,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-p", "--pickle", type=str, required=True,
         help="Filename for the pickle container of models. \
-              Row1: models; Row3: Dat per group")
+            Row1: Models, Row2: Var dictionary, Row3: data per group")
     ap.add_argument("-f", "--file", type=str, required=True,
         help="Filename pickle for records to be assesed. \
-              One row for gropus and other for data to be evaluated")
+              One row for gropus and other for data to be evaluated. \
+              Row1: groups; Row2: Dat per group")
     ap.add_argument("-g", "--group", type=int, required=True,
         help="Interesting group for the prediction")
     ap.add_argument("-o", "--output", type=str, required=True,
@@ -71,7 +72,7 @@ def main():
     #
     args    = vars(ap.parse_args())
     pfich1  = args["pickle"]
-    f_xlsx  = args["file"]
+    f_eval  = args["file"]
     grp     = args["group"]
     preds   = args["output"]
     ovar    = args["target"]
@@ -86,16 +87,16 @@ def main():
     if not pkl_is:
         print(" *** Error: File " + pfich1 + " does not exist. We can't follow up")
         sys.exit(2)
-    fxlsx_is= exists(f_xlsx)
-    if not fxlsx_is:
-        print(" *** Error: File " + f_xlsx + " does not exist. Nothing to assess")
+    feval_is= exists(f_eval)
+    if not feval_is:
+        print(" *** Error: File " + f_eval + " does not exist. Nothing to assess")
         sys.exit(2)
     if verbose > 1:
         print("- Loading datasets ...")
-    regs    = pd.read_excel(f_xlsx)
-    with open(args["pickle"], "rb") as input_file:
-        mdlT = dill.load(input_file)
-        vidx = dill.load(input_file)
+    with open(pfich1, "rb") as input_file:
+        mdls= pickle.load(input_file)
+    with open(f_eval, "rb") as input_file:
+        lgrps= pickle.load(input_file)
         datg = dill.load(input_file)
     #
     if lperf > 0:
@@ -117,8 +118,7 @@ def main():
         for idx in mdlT.keys():
             relev = list(filter(r.match, idx))
             if len(relev) > 0 and mdlT[idx]['Full']['grp'] == grp:
-                relm = list(filter(rp.match,mdlT[idx]['Full']['nam_mdlT']))
-                
+                relm = list(filter(rp.match,mdlT[idx]['Full']['nam_mdlT']))                
 #
 #
 #
