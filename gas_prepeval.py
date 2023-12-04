@@ -84,7 +84,6 @@ def main():
     dats    = segmenta(datl,cdate,verbose)
     #
     with open(pfich3, "wb") as output_file:
-        pickle.dump(dats['grupos'],output_file,pickle.HIGHEST_PROTOCOL)
         pickle.dump(dats['datgrps'],output_file,pickle.HIGHEST_PROTOCOL)
     #
     return(None)
