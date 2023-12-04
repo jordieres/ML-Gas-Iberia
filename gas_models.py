@@ -228,21 +228,38 @@ def train_model(dat,vars,dout,vmodel,nump,lngcut,grp,vrb):
 #
 def extract_perf(obj):
     res = {}
-    res['model'] = obj._metric_json['model']
-    res['model_category']   = obj._metric_json['model_category']
-    res['nobs']  = obj._metric_json['nobs']
-    res['algo']  = obj._algo
-    res['on']    = obj._on
-    res['residual_degrees_of_freedom'] = obj._metric_json['residual_degrees_of_freedom']
-    res['MSE']   = obj._metric_json['MSE']
-    res['RMSE']  = obj._metric_json['RMSE']
-    res['r2']    = obj._metric_json['r2']
-    res['rmsle'] = obj._metric_json['rmsle']
-    res['mae']   = obj._metric_json['mae']
-    res['mean_residual_deviance']= obj._metric_json['mean_residual_deviance']
-    res['residual_deviance']= obj._metric_json['residual_deviance']
-    res['AIC']   = obj._metric_json['AIC']
-    res['null_deviance']    = obj.__metric_json['null_deviance']
+    if 'model' in obj._metric_json.keys():
+        res['model'] = obj._metric_json['model']
+    if 'model_category' in obj._metric_json.keys():
+        res['model_category']   = obj._metric_json['model_category']
+    if 'nobs' in obj._metric_json.keys():
+        res['nobs']  = obj._metric_json['nobs']
+    if 'algo' in obj._metric_json.keys():
+        res['algo']  = obj._algo
+    if '_on' in obj._metric_json.keys():
+        res['on']    = obj._on
+    if 'residual_degrees_of_freedom' in obj._metric_json.keys():
+        res['residual_degrees_of_freedom'] = obj._metric_json[
+            'residual_degrees_of_freedom']
+    if 'MSE' in obj._metric_json.keys():
+        res['MSE']   = obj._metric_json['MSE']
+    if 'RMSE' in obj._metric_json.keys():
+        res['RMSE']  = obj._metric_json['RMSE']
+    if 'r2' in obj._metric_json.keys():
+        res['r2']    = obj._metric_json['r2']
+    if 'rmsle' in obj._metric_json.keys():
+        res['rmsle'] = obj._metric_json['rmsle']
+    if 'mae' in obj._metric_json.keys():
+        res['mae']   = obj._metric_json['mae']
+    if 'mean_residual_deviance' in obj._metric_json.keys():
+        res['mean_residual_deviance']= obj._metric_json[
+            'mean_residual_deviance']
+    if 'residual_deviance' in obj._metric_json.keys():
+        res['residual_deviance']= obj._metric_json['residual_deviance']
+    if 'AIC' in obj._metric_json.keys():
+        res['AIC']   = obj._metric_json['AIC']
+    if 'null_deviance' in obj._metric_json.keys():
+        res['null_deviance']    = obj._metric_json['null_deviance']
     return(res)
 #
 #
