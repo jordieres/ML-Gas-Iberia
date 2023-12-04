@@ -181,7 +181,9 @@ def train_model(dat,vars,dout,vmodel,nump,lngcut,grp,vrb):
     nam_mdl  = h2o.save_model(model=bm, path=dout, force=True)
     if vrb > 0:
         print("   - Name of Full Model:"+ nam_mdl)
-    mdlT     = {'y':y,'x':x,'yorg':y_actual,'ypred':y_pred,'mse':yerr,
+    mdlT     = {'y':y,'x':x,'yorg':y_actual.as_data_frame(),
+                'ypred':y_pred.as_data_frame(),'mse':yerr,
+                'lst_mdls': ltmdls.as_data_frame(),
                 'mdl_imp':varimp,'grp':grp,'perf':extract_perf(perf),
                 'mdl_nam':nam_mdl}
     #
@@ -220,7 +222,9 @@ def train_model(dat,vars,dout,vmodel,nump,lngcut,grp,vrb):
     nam_mdlR = h2o.save_model(model=bmR, path=dout+'/short/', force=True)
     if vrb > 0:
         print("   - Name of Restricted Model:"+ nam_mdlR)
-    mdlR     = {'y':y,'x':x,'yorg':y_actualR,'ypred':y_predR,'mse':yerrR,
+    mdlR     = {'y':y,'x':x,'yorg':y_actualR.as_data_frame(),
+                'ypred':y_predR.as_data_frame(),'mse':yerrR,
+                'lst_mdls': ltmdlsR.as_data_frame(),                
                 'mdl_imp':varimpR,'grp':grp,'perf':extract_perf(perfR),
                 'mdl_nam':nam_mdlR}          
     res = {'Full':mdlT,'Rest':mdlR}
