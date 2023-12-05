@@ -139,8 +139,9 @@ def main():
     ecopkl  = dmdl+"/summary_mdls_"+ datetime.datetime.strftime(
             datetime.datetime.now(),"%Y-%m-%dT%H:%M:%S") + ".pkl"
     #
+    cad = json.dumps(mdlT)
     with open(ecopkl, "wb") as output_file:
-        pickle.dump(mdlT,output_file)
+        pickle.dump(cad,output_file)
         pickle.dump(vidx,output_file)
         pickle.dump(datg,output_file)
     return(None)

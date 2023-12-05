@@ -8,10 +8,9 @@
 # The output file will be an excel file 
 # (C) UPM.  JOM 2023-11-30
 # 
-import ast, json, random, argparse
-import os, sys, datetime, shutil, pdb
-import statistics, smtplib, ssl, re, string
-import datetime, math, pickle, dill, pdb
+import ast, json, random, argparse, re
+import os, sys, datetime, shutil
+import datetime, math, pickle, pdb
 import h2o
 #
 import numpy as np
@@ -66,8 +65,9 @@ def main():
         help="Variable under interest for prediction")
     ap.add_argument("-m", "--model", type=str, required=False,
         help="Pattern of models to be used for prediction")
-    ap.add_argument("-l", "--list", nargs='?', dest='list',
-        help="List of models with performance for information")
+    ap.add_argument("-l", "--list", nargs='?', action=VAction, 
+        help="List of models with performance for information",
+        required=False, dest='list')
     ap.add_argument('-v', nargs='?', action=VAction, dest='verbose')
     #
     args    = vars(ap.parse_args())
@@ -94,31 +94,72 @@ def main():
     if verbose > 1:
         print("- Loading datasets ...")
     with open(pfich1, "rb") as input_file:
-        mdls= pickle.load(input_file)
+        txtmd= pickle.load(input_file)
+    mdlT = json.loads(txtmd)
     with open(f_eval, "rb") as input_file:
-        lgrps= pickle.load(input_file)
-        datg = dill.load(input_file)
+        datg = pickle.load(input_file)
+    lgrps= list(datg.keys())
     #
     if lperf > 0:
-        r = re.compile(ovar)
         for idx in mdlT.keys():
-            relev = list(filter(r.match, idx))
+            relev = re.findall(ovar, idx)
             if len(relev) > 0 and mdlT[idx]['Full']['grp'] == grp:
                 prfT = mdlT[idx]['Full']['perf']
                 prfR = mdlT[idx]['Rest']['perf']
                 xT   = mdlT[idx]['Full']['x']
-                namT = mdlT[idx]['Full']['nam_mdlT']
-                namR = mdlT[idx]['Rest']['nam_mdlR']
+                namT = mdlT[idx]['Full']['mdl_nam']
+                namR = mdlT[idx]['Rest']['mdl_nam']
                 xR   = mdlT[idx]['Rest']['x']
-                print(" Var: {idx:15s}. Num_vars: {len(xT):%3d} R2: {prfT['R2']:%6.4f} Model: {namT:%40s}")
-                print(" Var:                . Num_vars: {len(xR):%3d} R2: {prfR['R2']:%6.4f Model: {namR:%40s}")
+                tmdlT= json.loads(mdlT[idx]['Full']['lst_mdls'])['algo']['0']
+                tmdlR= json.loads(mdlT[idx]['Rest']['lst_mdls'])['algo']['0']
+                print(' Var: {0:>25s}. Type: {1:>25s}.  Num_vars: {2:>3d}  R2: {3:>6.4f} Model: {4:>40s}'.format(
+                        idx,tmdlT,len(xT),prfT['r2'],namT))
+                print('                                 ' + 
+                    'Type: {0:>25s}.  Num_vars: {1:>3d}  R2: {2:>6.4f} Model: {3:>40s}'.format(
+                        tmdlR, len(xR),prfR['r2'],namR))
     #
     if len(t_mdl) > 0:
-        rp = re.compile(t_mdl)
+        idl   = 0
+        cmmdl = pd.DataFrame([{'keys':'','type':'', 'path':''}])
+        res   = {}
         for idx in mdlT.keys():
-            relev = list(filter(r.match, idx))
+            relev = re.findall(t_mdl, idx)
             if len(relev) > 0 and mdlT[idx]['Full']['grp'] == grp:
-                relm = list(filter(rp.match,mdlT[idx]['Full']['nam_mdlT']))                
+                tmdlT= json.loads(mdlT[idx]['Full']['lst_mdls'])['algo']['0']
+                tmdlR= json.loads(mdlT[idx]['Rest']['lst_mdls'])['algo']['0']
+                typ  = 'Full'
+                relm = re.findall(t_mdl,tmdlT)
+                if len(relm) > 0:
+                    res, cmmdl = mdl_predict(mdlT,typ,tmdlT,datg[grp],cmmdl,res,idx)
+                typ  = 'Rest'
+                relm = re.findall(t_mdl,tmdlR)
+                if len(relm) > 0:
+                    res, cmmdl = mdl_predict(mdlT,typ,tmdlR,datg[grp],cmmdl,res,idx)
+        # 
+        # Write excel sheets inside the book
+        with pd.ExcelWriter(preds) as fex:
+            for idx in res.keys():
+                res[idx].to_excel(fex,sheet_name=idx, index=False)
+            cmmdl.to_excel(fex, sheet_name='Models', index=False)
+    return(None)
+#
+def mdl_predict(mdlT,typ,tmdl,datg,cmmdl,res,idx):
+    xT   = mdlT[idx][typ]['x']
+    namT = mdlT[idx][typ]['mdl_nam']
+    model= h2o.load_model(namT)
+    DFtst= datg.loc[:,xT]
+    h2oft= h2o.H2OFrame(DFtst)
+    y_prd= model.predict(h2oft)
+    y_act= datg.loc[:,[idx]]
+    if len(cmmdl) == 0: # Build the res DF
+        res[idx] = pd.DataFrame({'Time:ISO':datg.loc[:,'Time:ISO'],
+                            'Real_Values':y_act.iloc[:,0]})
+    else:
+        vmdl     = 'MDL_{0:>3d}'.format(idx)
+        res[idx] = pd.concat(res[idx],vmdl:y_prd.iloc[:,0])
+        cmmdl    = pd.concat([cmmdl, pd.DataFrame([{'key': vmdl, \
+                    'type':tmdl,'path': namT}])],axis=0)
+    return(res,cmmdl)
 #
 #
 #
