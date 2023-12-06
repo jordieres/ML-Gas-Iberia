@@ -8,7 +8,7 @@ The provided example code is understood according to two different phases:
 Each of the phases are presented in the following diagrams, to make clear how the processes have been defined
 
 ## Modelling Phase
-![Modelling](ML-Gas-Iberia/Enel_Modelling.png)
+![Modelling](Enel_Modelling.png)
 
 It ends with the creation of a set of models and a summary helping to select the convenient one for next steps.
 
