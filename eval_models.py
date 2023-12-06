@@ -119,46 +119,55 @@ def main():
                         tmdlR, len(xR),prfR['r2'],namR))
     #
     if len(t_mdl) > 0:
+        cltr  = h2o.init()
         idl   = 0
-        cmmdl = pd.DataFrame([{'keys':'','type':'', 'path':''}])
+        cmmdl = pd.DataFrame([{'key':'','type':'', 'path':''}])
         res   = {}
         for idx in mdlT.keys():
-            relev = re.findall(t_mdl, idx)
+            relev = re.findall(ovar, idx)
             if len(relev) > 0 and mdlT[idx]['Full']['grp'] == grp:
                 tmdlT= json.loads(mdlT[idx]['Full']['lst_mdls'])['algo']['0']
                 tmdlR= json.loads(mdlT[idx]['Rest']['lst_mdls'])['algo']['0']
                 typ  = 'Full'
                 relm = re.findall(t_mdl,tmdlT)
                 if len(relm) > 0:
-                    res, cmmdl = mdl_predict(mdlT,typ,tmdlT,datg[grp],cmmdl,res,idx)
+                    idl += 1
+                    res, cmmdl = mdl_predict(mdlT,typ,tmdlT,datg[grp],cmmdl,res,idx,idl)
                 typ  = 'Rest'
                 relm = re.findall(t_mdl,tmdlR)
                 if len(relm) > 0:
-                    res, cmmdl = mdl_predict(mdlT,typ,tmdlR,datg[grp],cmmdl,res,idx)
+                    idl += 1
+                    res, cmmdl = mdl_predict(mdlT,typ,tmdlR,datg[grp],cmmdl,res,idx,idl)
+        h2o.cluster().shutdown()
+        cmmdl.reset_index(drop=True,inplace=True)
         # 
         # Write excel sheets inside the book
         with pd.ExcelWriter(preds) as fex:
             for idx in res.keys():
-                res[idx].to_excel(fex,sheet_name=idx, index=False)
+                res[idx].to_excel(fex,sheet_name=idx.split(':')[0], 
+                                  index=False)
             cmmdl.to_excel(fex, sheet_name='Models', index=False)
     return(None)
 #
-def mdl_predict(mdlT,typ,tmdl,datg,cmmdl,res,idx):
+def mdl_predict(mdlT,typ,tmdl,datg,cmmdl,res,idx,idl):
     xT   = mdlT[idx][typ]['x']
     namT = mdlT[idx][typ]['mdl_nam']
     model= h2o.load_model(namT)
     DFtst= datg.loc[:,xT]
     h2oft= h2o.H2OFrame(DFtst)
-    y_prd= model.predict(h2oft)
+    y_prd= h2o.as_list(model.predict(h2oft))
     y_act= datg.loc[:,[idx]]
-    if len(cmmdl) == 0: # Build the res DF
+    vmdl = 'MDL_{0:>03d}'.format(idl)
+    if cmmdl.shape[0] == 1: # Build the res DF
         res[idx] = pd.DataFrame({'Time:ISO':datg.loc[:,'Time:ISO'],
-                            'Real_Values':y_act.iloc[:,0]})
+                    'Real_Values':y_act.iloc[:,0].tolist(),
+                    vmdl:y_prd.iloc[:,0].tolist()})
+        cmmdl    = pd.concat([cmmdl, pd.DataFrame([{'key': vmdl,
+                    'type':tmdl,'path': namT}])],axis=0,ignore_index=True)
     else:
-        vmdl     = 'MDL_{0:>3d}'.format(idx)
-        res[idx] = pd.concat(res[idx],vmdl:y_prd.iloc[:,0])
-        cmmdl    = pd.concat([cmmdl, pd.DataFrame([{'key': vmdl, \
-                    'type':tmdl,'path': namT}])],axis=0)
+        res[idx][vmdl] = y_prd.iloc[:,0].tolist()
+        cmmdl    = pd.concat([cmmdl, pd.DataFrame([{'key': vmdl,
+                    'type':tmdl,'path': namT}])],axis=0,ignore_index=True)
     return(res,cmmdl)
 #
 #
