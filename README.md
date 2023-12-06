@@ -8,6 +8,11 @@ The provided example code is understood according to two different phases:
 Each of the phases are presented in the following diagrams, to make clear how the processes have been defined
 
 ## Modelling Phase
+<object data="Enel_Modelling.pdf" type="application/pdf" width="700px" height="700px">
+    <embed src="https://github.com/jordieres/ML-Gas-Iberia/Enel_Modelling.pdf">
+        <p>This browser does not support PDFs. Please download the PDF to view it: <a href="https://github.com/jordieres/ML-Gas-Iberia/Enel_Modelling.pdf">Download PDF</a>.</p>
+    </embed>
+</object>
 xfun::embed_file("Enel_Modelling.pdf")
 
 It ends with the creation of a set of models and a summary helping to select the convenient one for next steps.
